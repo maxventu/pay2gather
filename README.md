@@ -42,6 +42,7 @@ If user edits message with payment, bot updates its responses
 </li></ol>
 
 ##Features:
+
 1. TODO: On /finish put links to all the payments and refresh state
 2. If user submitted a payment, remember his ID and username and use it for referencing on stats.
 TODO: get user's info from mention, not only when he pays himself
