@@ -23,8 +23,7 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp" %% "async-http-client-backend-cats" % "1.7.2",
   "org.slf4s" %% "slf4s-api" % "1.7.25",
   "org.scalatest" %% "scalatest" % "3.1.1" % "test",
-  // https://mvnrepository.com/artifact/net.objecthunter/exp4j
-  "net.objecthunter" % "exp4j" % expressionEvaluatorVersion,
+  "net.objecthunter" % "exp4j" % expressionEvaluatorVersion, // https://mvnrepository.com/artifact/net.objecthunter/exp4j
   "io.chrisdavenport" %% "log4cats-core"  % log4catsVersion,
   "io.chrisdavenport" %% "log4cats-slf4j" % log4catsVersion,
   "org.slf4j" % "slf4j-api"    % slf4jVersion,
