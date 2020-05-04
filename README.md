@@ -29,6 +29,7 @@ In case the failures happen, bot replies with reported issue during parsing
 If message is valid, bot saves payment
 - TODO: save to database
 - TODO: track currency
+- TODO: ignore duplicates
 </li><li>
 
 If user edits message with payment, bot updates its responses
@@ -44,5 +45,5 @@ If user edits message with payment, bot updates its responses
 ## Features:
 1. TODO: On /finish put links to all the payments and refresh state
 2. If user submitted a payment, remember his ID and username and use it for referencing on stats.
-TODO: get user's info from mention, not only when he pays himself
+Bot gets user's info from mention, not only when he pays himself
 

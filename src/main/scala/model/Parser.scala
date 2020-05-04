@@ -4,16 +4,16 @@ import java.time.Year
 import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder}
 import java.time.temporal.{ChronoField, TemporalAccessor}
 
+import cats.instances.list._
+import cats.instances.try_._
+import cats.syntax.traverse._
+import com.bot4s.telegram.models.Message
 import model.GatheringException.ParseError.{DateFormatException, ExpressionFormatException}
 import net.objecthunter.exp4j.ExpressionBuilder
 
 import scala.annotation.tailrec
-import scala.util.{Failure, Success, Try}
-import cats.syntax.traverse._
-import cats.instances.try_._
-import cats.instances.list._
-import com.bot4s.telegram.models.Message
 import scala.language.postfixOps
+import scala.util.{Failure, Success, Try}
 
 object Parser {
   def getCommand()(implicit message: Message): Option[String] = message.text match {
@@ -34,9 +34,9 @@ object Parser {
     text.split("\n").filter(_ != "").toList match {
       case head :: tail =>
         for {
-          description: Description <- Parser.parseFirstLine(head)
-          payments <- tail.traverse(l => Parser.parseLineRecord(l))
-        } yield PaymentMessage(description,payments, sender)
+          description <- Parser.parseFirstLine(head)
+          payments    <- tail.traverse(Parser.parseLineRecord)
+        } yield PaymentMessage(description, payments, sender)
       case _ => Failure(ExpressionFormatException(text))
     }
 

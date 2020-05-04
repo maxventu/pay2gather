@@ -9,7 +9,7 @@ import io.chrisdavenport.log4cats.Logger
 import model.Currency.BYN
 import model.GatheringException.ParseError
 import model.GatheringException.ParseError.{EmptyMessage, UserNotAvailable}
-import model.{MessageArchive, Parser, PaymentMessage, UserArchive}
+import model._
 
 import scala.collection.immutable
 import scala.language.higherKinds
@@ -28,17 +28,17 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
   }
 
   def generateAnswerToPaymentMessage(msg: Message): Try[PaymentMessage] = {
+    msg.entities.map(_.map(_.user.map(userIds.put)))
     (for {
       text <- toTry(msg.text, EmptyMessage)
       user <- toTry(msg.from, UserNotAvailable)
-      //      args <- commandArguments(msg) /*.map(_.map(_.replaceAll("_","\\\\_")))*/
     } yield Parser.parsePaymentMessage(text, userIds.put(user))).flatten
   }
 
   def replyToPaymentMsg(implicit msg: Message): F[Unit] = {
     val payment = generateAnswerToPaymentMessage(msg)
     val paymentText = payment match {
-      case Success(p) => p.toString
+      case Success(p) => printPayment(p, userIds)
       case Failure(e) => e.toString
     }
     replyArchive.getReply match {
@@ -108,6 +108,14 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
          |""".stripMargin
     ).void
   }
+  def printPayment(paymentMessage: PaymentMessage, userIds: UserArchive): String =
+    s"""
+       |${userIds.printUserWithId(paymentMessage.payer)} paid for ${paymentMessage.description}
+       |${paymentMessage.payments.map(printRecord(_,userIds)).mkString("\n")}
+       |""".stripMargin
+
+  def printRecord(record: Record, userIds: UserArchive) =
+    s"${record.users.map(userIds.printUserWithId).mkString(", ")} ${record.amount}${record.cur}"
 }
 
 
