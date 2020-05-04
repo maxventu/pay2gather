@@ -41,7 +41,7 @@ If user edits message with payment, bot updates its responses
 - Expenses - how much each user spent during the gathering. Either he paid for himself or others paid for him.
 </li></ol>
 
-##Features:
+## Features:
 1. TODO: On /finish put links to all the payments and refresh state
 2. If user submitted a payment, remember his ID and username and use it for referencing on stats.
 TODO: get user's info from mention, not only when he pays himself
