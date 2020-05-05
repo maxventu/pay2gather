@@ -6,12 +6,12 @@ Bot for tracking expenses of the group during the journey or one-time occasion.
 
 With `/pay` or `/pay4` command user types in all the payments he did at one place. He provides a message in following format:
 ```text
-/pay4 Dinner at Mc'Donalds, 2020-04-20
+/pay4 @user4 Dinner at Mc'Donalds, 2020-04-20
 @username1 @username2, User3 (20+30+40)*0.9BYN
 @username1 @username2 20BYN
 ```
 where first line:
-- TODO: who paid (optional, otherwise he's payer);
+- who paid (optional, otherwise sender is payer);
 - description;
 - date.
 

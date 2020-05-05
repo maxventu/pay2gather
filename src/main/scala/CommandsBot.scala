@@ -28,11 +28,12 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
   }
 
   def generateAnswerToPaymentMessage(msg: Message): Try[PaymentMessage] = {
-    msg.entities.map(_.map(_.user.map(userIds.put)))
+    val entities = msg.entities
+    entities.map(_.map(_.user.map(userIds.put)))
     (for {
       text <- toTry(msg.text, EmptyMessage)
       user <- toTry(msg.from, UserNotAvailable)
-    } yield Parser.parsePaymentMessage(text, userIds.put(user))).flatten
+    } yield Parser.parsePaymentMessage(text, userIds.put(user), entities)).flatten
   }
 
   def replyToPaymentMsg(implicit msg: Message): F[Unit] = {

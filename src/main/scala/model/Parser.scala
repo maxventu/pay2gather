@@ -7,7 +7,7 @@ import java.time.temporal.{ChronoField, TemporalAccessor}
 import cats.instances.list._
 import cats.instances.try_._
 import cats.syntax.traverse._
-import com.bot4s.telegram.models.Message
+import com.bot4s.telegram.models.{Message, MessageEntity, MessageEntityType}
 import model.GatheringException.ParseError.{DateFormatException, ExpressionFormatException}
 import net.objecthunter.exp4j.ExpressionBuilder
 
@@ -30,15 +30,28 @@ object Parser {
       case _: Failure[Double] => Failure(ExpressionFormatException(str))
     }
 
-  def parsePaymentMessage(text: String, sender: User) : Try[PaymentMessage] =
-    text.split("\n").filter(_ != "").toList match {
+  def parsePaymentMessage(text: String, sender: User, entities: Option[Seq[MessageEntity]]) : Try[PaymentMessage] = {
+    val whoPaidFromTo: Option[(Int, Int)] = text.indexOf("\n") match {
+      case i if i >= 0 => entities.map {
+        _.filter(a => a.offset <= i && (a.`type` == MessageEntityType.Mention || a.`type` == MessageEntityType.TextMention))
+          .map(a => (a.offset, a.offset + a.length))
+          .minBy(_._1)
+      }
+      case _ => None
+    }
+    val (who, finalText) = whoPaidFromTo match {
+      case Some((from,to)) => (User(text.slice(from,to)),text.slice(0,from) + text.slice(to,text.length))
+      case None => (sender,text)
+    }
+    finalText.split("\n").filter(_ != "").toList match {
       case head :: tail =>
         for {
           description <- Parser.parseFirstLine(head)
-          payments    <- tail.traverse(Parser.parseLineRecord)
-        } yield PaymentMessage(description, payments, sender)
+          payments <- tail.traverse(Parser.parseLineRecord)
+        } yield PaymentMessage(description, payments, who)
       case _ => Failure(ExpressionFormatException(text))
     }
+  }
 
   // TODO: introduce more readable parsing
   def parseFirstLine(str: String): Try[Description] = {
@@ -48,6 +61,7 @@ object Parser {
       .dropRight(1)
       .mkString(",")
       .split(" ")
+      .filter(_ != "")
       .drop(1)
       .mkString(" ")
     for {
