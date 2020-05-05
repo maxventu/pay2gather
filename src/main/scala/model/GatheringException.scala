@@ -12,4 +12,9 @@ object GatheringException {
     final case object EmptyMessage extends ParseError(s"Empty string")
     final case object UserNotAvailable extends ParseError(s"No user")
   }
+
+  sealed abstract class PaymentError(message: String) extends ValidationError(message)
+  object PaymentError {
+    final case object NotEnoughInfo extends PaymentError(s"Edit message to put payment")
+  }
 }

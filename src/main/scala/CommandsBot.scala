@@ -7,7 +7,7 @@ import com.bot4s.telegram.methods.{EditMessageText, ParseMode}
 import com.bot4s.telegram.models.Message
 import io.chrisdavenport.log4cats.Logger
 import model.Currency.BYN
-import model.GatheringException.ParseError
+import model.GatheringException.{ParseError, PaymentError}
 import model.GatheringException.ParseError.{EmptyMessage, UserNotAvailable}
 import model._
 
@@ -36,11 +36,19 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
     } yield Parser.parsePaymentMessage(text, userIds.put(user), entities)).flatten
   }
 
+  val helpMsg: String = Parser.escapeText(
+    """Please provide a payment in following format:
+      |/pay @user4 Meal at some place, 2020-04-20
+      |@username1 @username2, User3 (20+30+40)*0.9BYN
+      |@username1 @username2 20BYN
+      |""".stripMargin)
+
   def replyToPaymentMsg(implicit msg: Message): F[Unit] = {
     val payment = generateAnswerToPaymentMessage(msg)
     val paymentText = payment match {
       case Success(p) => printPayment(p, userIds)
-      case Failure(e) => e.toString
+      case Failure(e: PaymentError) => s"${e}\n/help"
+      case Failure(e) => s"Please fix your message by editing it\n${e}\n/help"
     }
     replyArchive.getReply match {
       case Some(reply) =>
@@ -75,12 +83,26 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
     }
   }
 
-  onCommand("/pay" | "/pay4") { implicit msg =>
-    Logger[F].info(s"Msg=${msg}") >>
+  onCommand("/pay") { implicit msg =>
+    Logger[F].info(s"/pay request: ${msg}") >>
       replyToPaymentMsg
   }
 
-  onCommand("/stat") { implicit msg =>
+  onCommand("/clean") { implicit msg =>
+    Logger[F].info(s"/clean request: ${msg}") >> {
+      replyArchive.msgToReplyId.clear()
+      unit
+    } >>
+      replyWithAnswer("history cleaned").void
+  }
+
+  onCommand("/help") {
+    implicit msg =>
+    Logger[F].info(s"/help request: ${msg}") >>
+      replyWithAnswer(helpMsg).void
+  }
+
+  onCommand("/stats") { implicit msg =>
     val defaultCurrency = BYN
     val successfulMessages: immutable.Seq[PaymentMessage] = replyArchive.msgToReplyId.values
       .filter(_.info.chatId == msg.chat.id)
@@ -93,22 +115,27 @@ class CommandsBot[F[_]: Async: Timer : ContextShift: Logger](token: String) exte
       } yield (m.payer, user, amountForOne)
     } groupBy (a => (a._1, a._2)) mapValues (_.map(_._3).sum)
     val gathernessMap = payedMap.toSeq
-      .flatMap{case ((from,to),amount) => Seq((from, amount), (to, -amount))}
+      .flatMap { case ((from, to), amount) => Seq((from, amount), (to, -amount)) }
       .groupBy(_._1)
       .mapValues(_.map(_._2).sum)
     val spentMap = payedMap.toSeq
-      .map{case ((_,to),amount) => (to, amount)}
+      .map { case ((_, to), amount) => (to, amount) }
       .groupBy(_._1)
       .mapValues(_.map(_._2).sum)
-    replyWithAnswer(
-      s"""Gatherness (${defaultCurrency}):
-         |${gathernessMap.toList.map(a => f"${userIds.printUserWithId(a._1)}: ${a._2}%1.2f").mkString("\n")}
-         |
-         |Spent (${defaultCurrency}):
-         |${spentMap.toList.map(a => f"${userIds.printUserWithId(a._1)}: ${a._2}%1.2f").mkString("\n")}
-         |""".stripMargin
+    if (successfulMessages.nonEmpty)
+      replyWithAnswer(
+        s"""Gatherness (${defaultCurrency}):
+            |${gathernessMap.toList.map(a => f"${userIds.printUserWithId(a._1)}: ${a._2}%1.2f").mkString("\n")}
+            |
+            |Spent (${defaultCurrency}):
+            |${spentMap.toList.map(a => f"${userIds.printUserWithId(a._1)}: ${a._2}%1.2f").mkString("\n")}
+            |/help
+            |""".stripMargin
     ).void
+    else replyWithAnswer("There was nothing reported\n\n/help").void
+
   }
+
   def printPayment(paymentMessage: PaymentMessage, userIds: UserArchive): String =
     s"""
        |${userIds.printUserWithId(paymentMessage.payer)} paid for ${paymentMessage.description}

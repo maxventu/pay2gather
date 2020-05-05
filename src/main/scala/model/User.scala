@@ -21,6 +21,6 @@ class UserArchive{
   def printUserWithId(user: User):String =
     getId(user) match {
       case Some(realId) => s"[${user}](tg://user?id=${realId})"
-      case None => s"${user}"
+      case None => Parser.escapeText(s"${user}")
     }
 }

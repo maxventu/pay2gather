@@ -1,6 +1,6 @@
 package model
 
-import java.time.Year
+import java.time.{LocalDate, Year}
 import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder}
 import java.time.temporal.{ChronoField, TemporalAccessor}
 
@@ -8,7 +8,9 @@ import cats.instances.list._
 import cats.instances.try_._
 import cats.syntax.traverse._
 import com.bot4s.telegram.models.{Message, MessageEntity, MessageEntityType}
+import model.Currency.BYN
 import model.GatheringException.ParseError.{DateFormatException, ExpressionFormatException}
+import model.GatheringException.PaymentError.NotEnoughInfo
 import net.objecthunter.exp4j.ExpressionBuilder
 
 import scala.annotation.tailrec
@@ -32,10 +34,13 @@ object Parser {
 
   def parsePaymentMessage(text: String, sender: User, entities: Option[Seq[MessageEntity]]) : Try[PaymentMessage] = {
     val whoPaidFromTo: Option[(Int, Int)] = text.indexOf("\n") match {
-      case i if i >= 0 => entities.map {
-        _.filter(a => a.offset <= i && (a.`type` == MessageEntityType.Mention || a.`type` == MessageEntityType.TextMention))
-          .map(a => (a.offset, a.offset + a.length))
-          .minBy(_._1)
+      case i if i >= 0 => entities.flatMap {
+        a => {
+          val list = a.filter(a => a.offset <= i && (a.`type` == MessageEntityType.Mention || a.`type` == MessageEntityType.TextMention))
+            .map(a => (a.offset, a.offset + a.length))
+          if (list.nonEmpty) Some(list.minBy(_._1))
+          else None
+        }
       }
       case _ => None
     }
@@ -44,6 +49,7 @@ object Parser {
       case None => (sender,text)
     }
     finalText.split("\n").filter(_ != "").toList match {
+      case _ :: tail if tail.isEmpty => Failure(NotEnoughInfo)
       case head :: tail =>
         for {
           description <- Parser.parseFirstLine(head)
@@ -64,9 +70,7 @@ object Parser {
       .filter(_ != "")
       .drop(1)
       .mkString(" ")
-    for {
-      date <- Parser.normalizeDate(dateStr)
-    } yield Description(description, date)
+     Try(Description(description, Parser.normalizeDate(dateStr)))
   }
 
   // TODO: introduce more readable parsing
@@ -83,16 +87,18 @@ object Parser {
       .map(User)
     val lastPart = parts.last
     lastPart match {
-      case SumRegex(expression, currencyStr) =>
+      case SumRegex(expression, currencyStr) => {
         for {
           calculatedExpression <- calculateExpression(expression)
           currency <- Currency(currencyStr)
         } yield Record(users, calculatedExpression, currency)
+      }
+      case oneStr => calculateExpression(oneStr).map(Record(users, _, BYN))
       case _ => Failure(ExpressionFormatException(lastPart))
     }
   }
 
-  def normalizeDate(dateStr: String): Try[String] = {
+  def normalizeDate(dateStr: String): String = {
     val dateFormats = List(
       "dd/MM/uuuu",
       "dd MMMM uuuu",
@@ -116,6 +122,9 @@ object Parser {
         }
       case _ => Failure(DateFormatException(dateStr))
     }
-    normalize(dateFormats).map(iso8601DateFormatter.format)
+    val now = LocalDate.now
+    normalize(dateFormats).map(iso8601DateFormatter.format).getOrElse(now.format(iso8601DateFormatter))
   }
+
+  def escapeText(t:String):String=com.bot4s.telegram.Implicits.MarkdownString(t).mdEscape
 }
