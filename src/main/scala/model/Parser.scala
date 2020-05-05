@@ -45,7 +45,7 @@ object Parser {
       case _ => None
     }
     val (who, finalText) = whoPaidFromTo match {
-      case Some((from,to)) => (User(text.slice(from,to)),text.slice(0,from) + text.slice(to,text.length))
+      case Some((from,to)) => (User(text.slice(from,to).replace("@","")),text.slice(0,from) + text.slice(to,text.length))
       case None => (sender,text)
     }
     finalText.split("\n").filter(_ != "").toList match {
@@ -70,7 +70,10 @@ object Parser {
       .filter(_ != "")
       .drop(1)
       .mkString(" ")
-     Try(Description(description, Parser.normalizeDate(dateStr)))
+    Try(Parser.normalizeDate(dateStr) match {
+      case Failure(_) => Description(s"${description}, ${dateStr}", LocalDate.now.format(DateTimeFormatter.ISO_LOCAL_DATE))
+      case Success(value) => Description(description, value)
+    })
   }
 
   // TODO: introduce more readable parsing
@@ -98,7 +101,7 @@ object Parser {
     }
   }
 
-  def normalizeDate(dateStr: String): String = {
+  def normalizeDate(dateStr: String): Try[String] = {
     val dateFormats = List(
       "dd/MM/uuuu",
       "dd MMMM uuuu",
@@ -122,8 +125,7 @@ object Parser {
         }
       case _ => Failure(DateFormatException(dateStr))
     }
-    val now = LocalDate.now
-    normalize(dateFormats).map(iso8601DateFormatter.format).getOrElse(now.format(iso8601DateFormatter))
+    normalize(dateFormats).map(iso8601DateFormatter.format)
   }
 
   def escapeText(t:String):String=com.bot4s.telegram.Implicits.MarkdownString(t).mdEscape
