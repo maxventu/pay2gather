@@ -112,20 +112,16 @@ object Parser {
       "d.M.uu",
       "uuuu.MM.dd",
       "d.M",
-    ).map(p => (p, new DateTimeFormatterBuilder().appendPattern(p).parseDefaulting(ChronoField.YEAR,Year.now.getValue).toFormatter))
+    ).map(p => new DateTimeFormatterBuilder().appendPattern(p).parseDefaulting(ChronoField.YEAR, Year.now.getValue).toFormatter)
     val iso8601DateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     val trimmedDate = dateStr.trim
-
-    @tailrec
-    def normalize(patterns: List[(String, DateTimeFormatter)]): Try[TemporalAccessor] = patterns match {
-      case head::tail =>
-        Try(head._2.parse(trimmedDate)) match {
-          case Success(value) => Success(value)
-          case Failure(_) => normalize(tail)
-        }
-      case _ => Failure(DateFormatException(dateStr))
-    }
-    normalize(dateFormats).map(iso8601DateFormatter.format)
+    dateFormats
+      .foldLeft[Try[TemporalAccessor]](Failure(DateFormatException(dateStr))) {
+        (res, format) =>
+          res.recoverWith {
+            case _ => Try(format.parse(trimmedDate))
+          }
+      }.map(iso8601DateFormatter.format)
   }
 
   def escapeText(t:String):String=com.bot4s.telegram.Implicits.MarkdownString(t).mdEscape

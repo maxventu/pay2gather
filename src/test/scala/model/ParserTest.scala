@@ -1,8 +1,9 @@
 package model
 
 import model.Currency.{BYN, Dollar}
+import org.scalatest.TryValues
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class ParserTest extends org.scalatest.flatspec.AnyFlatSpec {
   it should "parse different formats of dates same way" in {
@@ -27,6 +28,29 @@ class ParserTest extends org.scalatest.flatspec.AnyFlatSpec {
       assertResult
       (Success("2020-04-09"))
       (Parser.normalizeDate(d))
+    )
+  }
+  it should "fail, if format of date wasn't recognized" in {
+    val inputs = List(
+      "09/04_2020",
+      "09 Aprilt 2020",
+      "39 Apr 2020    ",
+      "09+04-2020",
+      " dd   2020-04-09   ",
+      "09.04,2020",
+      "09.04.20--",
+      "00.04.2020",
+      "9.0.2020",
+      "9.4.-00",
+      "2a20.04.09",
+      "0904",
+      "   dd.mm",
+      "9",
+      ".4",
+      "9.",
+    )
+    inputs.map(d =>
+      assert(Parser.normalizeDate(d).isFailure, s"date str was: $d")
     )
   }
 
